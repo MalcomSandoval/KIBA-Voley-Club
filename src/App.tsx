@@ -6,6 +6,8 @@ import Auth from './components/Auth';
 import PlayerForm from './components/PlayerForm';
 import PaymentForm from './components/PaymentForm';
 import GroupForm from './components/GroupForm';
+import PaymentReport from './components/PaymentReport';
+import { usePaymentReport } from './hooks/usePaymentReport';
 
 type Section = 'dashboard' | 'players' | 'payments' | 'groups';
 type FormType = 'player' | 'payment' | 'group' | null;
@@ -34,6 +36,9 @@ function App() {
   const [showForm, setShowForm] = useState<FormType>(null);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [operationLoading, setOperationLoading] = useState(false);
+
+  // Payment report hook
+  const { showReport, reportData, generateReport, closeReport } = usePaymentReport();
 
   // Form states
   const [playerForm, setPlayerForm] = useState({
@@ -581,6 +586,18 @@ function App() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
                         <button 
+                          onClick={() => {
+                            const player = players.find(p => p.id === payment.player_id);
+                            if (player) {
+                              generateReport(payment, player);
+                            }
+                          }}
+                          className="text-green-600 hover:text-green-900 transition-colors"
+                          title="Generar reporte"
+                        >
+                          <DollarSign className="h-4 w-4" />
+                        </button>
+                        <button 
                           onClick={() => handleEditPayment(payment)}
                           className="text-blue-600 hover:text-blue-900 transition-colors"
                         >
@@ -835,6 +852,15 @@ function App() {
           onFormChange={handleGroupFormChange}
           onSave={handleSaveGroup}
           onClose={closeForm}
+        />
+      )}
+      
+      {/* Payment Report */}
+      {showReport && reportData && (
+        <PaymentReport
+          payment={reportData.payment}
+          player={reportData.player}
+          onClose={closeReport}
         />
       )}
     </div>
