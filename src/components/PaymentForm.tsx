@@ -83,7 +83,7 @@ export default function PaymentForm({
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad (€)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad ($)</label>
             <input
               type="number"
               value={paymentForm.amount}
