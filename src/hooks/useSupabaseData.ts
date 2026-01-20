@@ -75,6 +75,7 @@ export function useSupabaseData(userId: string | undefined) {
   };
 
   useEffect(() => {
+    setLoading(true);
     fetchData();
   }, [userId]);
 
