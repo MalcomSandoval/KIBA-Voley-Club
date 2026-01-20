@@ -70,7 +70,7 @@ function App() {
     max_players: 12
   });
 
-  const positions = ['Atacante/Rematador', 'Líbero', 'Central/Bloqueador', 'Colocador/Armador', 'Opuesto', 'Receptor/Pasador'];
+  const positions = ['Atacante/Rematador', 'Líbero', 'Central/Bloqueador', 'Colocador/Armador', 'Opuesto', 'Receptor/Pasador', 'Sin posición definida'];
   const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const categories = ['Sub-12', 'Sub-14', 'Sub-16', 'Sub-18', 'Juvenil', 'Adultos', 'Veteranos'];
 
