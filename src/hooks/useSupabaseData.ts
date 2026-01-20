@@ -13,42 +13,47 @@ export function useSupabaseData(userId: string | undefined) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch all data
+  // ========================================
+  // FETCH ALL DATA - COOPERATIVO (SIN FILTROS user_id)
+  // ========================================
   const fetchData = async () => {
-    if (!userId) return;
+    if (!userId) {
+      setPlayers([]);
+      setPayments([]);
+      setGroups([]);
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
 
-      // Fetch groups
+      // Fetch groups - SIN FILTRO user_id
       const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
         .select('*')
-        .eq('user_id', userId)
         .order('name');
 
       if (groupsError) throw groupsError;
 
-      // Fetch players with group names
+      // Fetch players with group names - SIN FILTRO user_id
       const { data: playersData, error: playersError } = await supabase
         .from('players')
         .select(`
           *,
           groups(name)
         `)
-        .eq('user_id', userId)
         .order('name');
 
       if (playersError) throw playersError;
 
-      // Fetch payments with player names
+      // Fetch payments with player names - SIN FILTRO user_id
       const { data: paymentsData, error: paymentsError } = await supabase
         .from('payments')
         .select(`
           *,
           players(name)
         `)
-        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (paymentsError) throw paymentsError;
@@ -77,15 +82,60 @@ export function useSupabaseData(userId: string | undefined) {
   useEffect(() => {
     setLoading(true);
     fetchData();
+
+    // ========================================
+    // REALTIME SUBSCRIPTIONS - COOPERATIVAS
+    // ========================================
+    const groupsChannel = supabase
+      .channel('groups-all-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'groups' },
+        () => {
+          console.log('Group changed, refetching...');
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const playersChannel = supabase
+      .channel('players-all-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'players' },
+        () => {
+          console.log('Player changed, refetching...');
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    const paymentsChannel = supabase
+      .channel('payments-all-changes')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'payments' },
+        () => {
+          console.log('Payment changed, refetching...');
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      groupsChannel.unsubscribe();
+      playersChannel.unsubscribe();
+      paymentsChannel.unsubscribe();
+    };
   }, [userId]);
 
-  // CRUD Operations for Groups
+  // ========================================
+  // CRUD OPERATIONS FOR GROUPS - COOPERATIVO
+  // ========================================
   const createGroup = async (groupData: Omit<Tables['groups']['Insert'], 'user_id'>) => {
     if (!userId) return null;
 
+    // SIN user_id en el insert
     const { data, error } = await supabase
       .from('groups')
-      .insert({ ...groupData, user_id: userId })
+      .insert(groupData)
       .select()
       .single();
 
@@ -95,11 +145,11 @@ export function useSupabaseData(userId: string | undefined) {
   };
 
   const updateGroup = async (id: string, groupData: Tables['groups']['Update']) => {
+    // SIN filtro user_id
     const { data, error } = await supabase
       .from('groups')
       .update(groupData)
       .eq('id', id)
-      .eq('user_id', userId)
       .select()
       .single();
 
@@ -109,47 +159,49 @@ export function useSupabaseData(userId: string | undefined) {
   };
 
   const deleteGroup = async (id: string) => {
-    // Check if group has players
+    // Check if group has players - SIN FILTRO user_id
     const { data: playersInGroup } = await supabase
       .from('players')
       .select('id')
-      .eq('group_id', id)
-      .eq('user_id', userId);
+      .eq('group_id', id);
 
     if (playersInGroup && playersInGroup.length > 0) {
       throw new Error('No puedes eliminar un grupo que tiene jugadores asignados');
     }
 
+    // SIN filtro user_id
     const { error } = await supabase
       .from('groups')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
 
     if (error) throw error;
     await fetchData();
   };
 
-  // CRUD Operations for Players
+  // ========================================
+  // CRUD OPERATIONS FOR PLAYERS - COOPERATIVO
+  // ========================================
   const createPlayer = async (playerData: Omit<Tables['players']['Insert'], 'user_id'>) => {
     if (!userId) return null;
 
-    // Check if jersey number is already taken
+    // Check if jersey number is already taken - SIN FILTRO user_id
     if (playerData.jersey_number) {
       const { data: existingPlayer } = await supabase
         .from('players')
         .select('id')
         .eq('jersey_number', playerData.jersey_number)
-        .eq('user_id', userId)
         .single();
 
       if (existingPlayer) {
         throw new Error(`El número de camiseta ${playerData.jersey_number} ya está en uso`);
       }
     }
+
+    // SIN user_id en el insert
     const { data, error } = await supabase
       .from('players')
-      .insert({ ...playerData, user_id: userId })
+      .insert(playerData)
       .select()
       .single();
 
@@ -165,13 +217,12 @@ export function useSupabaseData(userId: string | undefined) {
   };
 
   const updatePlayer = async (id: string, playerData: Tables['players']['Update']) => {
-    // Check if jersey number is already taken by another player
+    // Check if jersey number is already taken - SIN FILTRO user_id
     if (playerData.jersey_number) {
       const { data: existingPlayer } = await supabase
         .from('players')
         .select('id')
         .eq('jersey_number', playerData.jersey_number)
-        .eq('user_id', userId)
         .neq('id', id)
         .single();
 
@@ -179,6 +230,7 @@ export function useSupabaseData(userId: string | undefined) {
         throw new Error(`El número de camiseta ${playerData.jersey_number} ya está en uso`);
       }
     }
+
     // Get current player data to check group changes
     const { data: currentPlayer } = await supabase
       .from('players')
@@ -186,11 +238,11 @@ export function useSupabaseData(userId: string | undefined) {
       .eq('id', id)
       .single();
 
+    // SIN filtro user_id
     const { data, error } = await supabase
       .from('players')
       .update(playerData)
       .eq('id', id)
-      .eq('user_id', userId)
       .select()
       .single();
 
@@ -218,18 +270,17 @@ export function useSupabaseData(userId: string | undefined) {
       .eq('id', id)
       .single();
 
-    // Delete related payments first
+    // Delete related payments first - SIN FILTRO user_id
     await supabase
       .from('payments')
       .delete()
-      .eq('player_id', id)
-      .eq('user_id', userId);
+      .eq('player_id', id);
 
+    // SIN filtro user_id
     const { error } = await supabase
       .from('players')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
 
     if (error) throw error;
 
@@ -241,15 +292,17 @@ export function useSupabaseData(userId: string | undefined) {
     await fetchData();
   };
 
-  // CRUD Operations for Payments
+  // ========================================
+  // CRUD OPERATIONS FOR PAYMENTS - COOPERATIVO
+  // ========================================
   const createPayment = async (paymentData: Omit<Tables['payments']['Insert'], 'user_id'>) => {
     if (!userId) return null;
 
+    // SIN user_id en el insert
     const { data, error } = await supabase
       .from('payments')
       .insert({ 
-        ...paymentData, 
-        user_id: userId,
+        ...paymentData,
         paid_date: paymentData.status === 'paid' ? new Date().toISOString().split('T')[0] : null
       })
       .select()
@@ -266,11 +319,11 @@ export function useSupabaseData(userId: string | undefined) {
       paid_date: paymentData.status === 'paid' ? new Date().toISOString().split('T')[0] : null
     };
 
+    // SIN filtro user_id
     const { data, error } = await supabase
       .from('payments')
       .update(updateData)
       .eq('id', id)
-      .eq('user_id', userId)
       .select()
       .single();
 
@@ -280,11 +333,11 @@ export function useSupabaseData(userId: string | undefined) {
   };
 
   const deletePayment = async (id: string) => {
+    // SIN filtro user_id
     const { error } = await supabase
       .from('payments')
       .delete()
-      .eq('id', id)
-      .eq('user_id', userId);
+      .eq('id', id);
 
     if (error) throw error;
     await fetchData();
@@ -301,7 +354,9 @@ export function useSupabaseData(userId: string | undefined) {
     });
   };
 
-  // Helper function to update group player count
+  // ========================================
+  // HELPER FUNCTIONS
+  // ========================================
   const updateGroupPlayerCount = async (groupId: string, change: number) => {
     const { data: group } = await supabase
       .from('groups')
