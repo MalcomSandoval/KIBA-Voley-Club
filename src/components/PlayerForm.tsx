@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Save, Users } from 'lucide-react';
+import { formatDateToISO } from '../lib/dateUtils';
 
 interface PlayerFormProps {
   editingItem: any;
@@ -123,7 +124,7 @@ export default function PlayerForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Nacimiento</label>
             <input
               type="date"
-              value={playerForm.birth_date}
+              value={formatDateToISO(playerForm.birth_date)}
               onChange={(e) => onFormChange('birth_date', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
@@ -144,7 +145,7 @@ export default function PlayerForm({
             <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Ingreso</label>
             <input
               type="date"
-              value={playerForm.join_date}
+              value={formatDateToISO(playerForm.join_date)}
               onChange={(e) => onFormChange('join_date', e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />

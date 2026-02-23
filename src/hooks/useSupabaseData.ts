@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Database } from '../lib/supabase';
 
 type Tables = Database['public']['Tables'];
-type Player = Tables['players']['Row'] & { group_name?: string };
+type Player = Tables['players']['Row'] & { group_name?: string; group_category?: string };
 type Payment = Tables['payments']['Row'] & { player_name?: string };
 type Group = Tables['groups']['Row'];
 
@@ -11,6 +11,7 @@ export function useSupabaseData(userId: string | undefined) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   // ========================================
@@ -36,12 +37,21 @@ export function useSupabaseData(userId: string | undefined) {
 
       if (groupsError) throw groupsError;
 
+      // Extract unique categories from groups
+      const uniqueCategories = Array.from(
+        new Set(
+          groupsData
+            ?.map(group => group.category)
+            .filter(Boolean) || []
+        )
+      ).sort();
+
       // Fetch players with group names - SIN FILTRO user_id
       const { data: playersData, error: playersError } = await supabase
         .from('players')
         .select(`
           *,
-          groups(name)
+          groups(name, category)
         `)
         .order('name');
 
@@ -61,7 +71,8 @@ export function useSupabaseData(userId: string | undefined) {
       // Process data
       const processedPlayers = playersData?.map(player => ({
         ...player,
-        group_name: player.groups?.name || 'Sin grupo'
+        group_name: player.groups?.name || 'Sin grupo',
+        group_category: player.groups?.category || ''
       })) || [];
 
       const processedPayments = paymentsData?.map(payment => ({
@@ -72,6 +83,7 @@ export function useSupabaseData(userId: string | undefined) {
       setGroups(groupsData || []);
       setPlayers(processedPlayers);
       setPayments(processedPayments);
+      setCategories(uniqueCategories);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -376,6 +388,7 @@ export function useSupabaseData(userId: string | undefined) {
     players,
     payments,
     groups,
+    categories,
     loading,
     createGroup,
     updateGroup,

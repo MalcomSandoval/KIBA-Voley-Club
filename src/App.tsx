@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, CreditCard, Users as Users2, Home, Plus, Search, CreditCard as Edit, Trash2, Wallet as Volleyball, Phone, Mail, Calendar, DollarSign, CheckCircle, XCircle, X, Save, LogOut, Hash } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useSupabaseData } from './hooks/useSupabaseData';
@@ -7,7 +7,9 @@ import PlayerForm from './components/PlayerForm';
 import PaymentForm from './components/PaymentForm';
 import GroupForm from './components/GroupForm';
 import PaymentReport from './components/PaymentReport';
+import PlayerDetails from './components/PlayerDetails';
 import { usePaymentReport } from './hooks/usePaymentReport';
+import { formatDateToISO } from './lib/dateUtils';
 
 type Section = 'dashboard' | 'players' | 'payments' | 'groups';
 type FormType = 'player' | 'payment' | 'group' | null;
@@ -18,6 +20,7 @@ function App() {
     players,
     payments,
     groups,
+    categories,
     loading: dataLoading,
     createGroup,
     updateGroup,
@@ -33,9 +36,21 @@ function App() {
 
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedPlayerCategory, setSelectedPlayerCategory] = useState('');
   const [showForm, setShowForm] = useState<FormType>(null);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [operationLoading, setOperationLoading] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
+  const [showPlayerDetails, setShowPlayerDetails] = useState(false);
+
+  /**
+   * Limpia los filtros de búsqueda y categoría cuando se cambia de sección
+   */
+  useEffect(() => {
+    setSearchTerm('');
+    setSelectedPlayerCategory('');
+    setShowForm(null);
+  }, [activeSection]);
 
   // Payment report hook
   const { showReport, reportData, generateReport, closeReport } = usePaymentReport();
@@ -59,7 +74,8 @@ function App() {
     month: '',
     year: new Date().getFullYear(),
     status: 'pending' as 'paid' | 'pending',
-    due_date: ''
+    due_date: '',
+    category: ''
   });
 
   const [groupForm, setGroupForm] = useState({
@@ -72,7 +88,6 @@ function App() {
 
   const positions = ['Atacante/Rematador', 'Líbero', 'Central/Bloqueador', 'Colocador/Armador', 'Opuesto', 'Sin posición definida'];
   const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-  const categories = ['Sub-12', 'Sub-14', 'Sub-16', 'Sub-18', 'Juvenil', 'Adultos', 'Veteranos'];
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -82,6 +97,10 @@ function App() {
   ];
 
   // Helper functions
+  /**
+   * Reinicia todos los formularios a sus valores iniciales
+   * Se utiliza después de guardar/actualizar datos o al cerrar un formulario
+   */
   const resetForms = () => {
     setPlayerForm({
       name: '',
@@ -100,7 +119,8 @@ function App() {
       month: '',
       year: new Date().getFullYear(),
       status: 'pending',
-      due_date: ''
+      due_date: '',
+      category: ''
     });
     setGroupForm({
       name: '',
@@ -112,24 +132,46 @@ function App() {
     setEditingItem(null);
   };
 
+  /**
+   * Cierra el formulario actual y reinicia todos los estados relacionados
+   */
   const closeForm = () => {
     setShowForm(null);
     resetForms();
   };
 
   // Input handlers to prevent re-rendering issues
+  /**
+   * Maneja los cambios en los campos del formulario de jugadores
+   * @param {string} field - Nombre del campo a actualizar
+   * @param {string | number} value - Nuevo valor del campo
+   */
   const handlePlayerFormChange = (field: string, value: string | number) => {
     setPlayerForm(prev => ({ ...prev, [field]: value }));
   };
 
+  /**
+   * Maneja los cambios en los campos del formulario de pagos
+   * @param {string} field - Nombre del campo a actualizar
+   * @param {string | number} value - Nuevo valor del campo
+   */
   const handlePaymentFormChange = (field: string, value: string | number) => {
     setPaymentForm(prev => ({ ...prev, [field]: value }));
   };
 
+  /**
+   * Maneja los cambios en los campos del formulario de grupos
+   * @param {string} field - Nombre del campo a actualizar
+   * @param {string | number} value - Nuevo valor del campo
+   */
   const handleGroupFormChange = (field: string, value: string | number) => {
     setGroupForm(prev => ({ ...prev, [field]: value }));
   };
   // CRUD Operations for Players
+  /**
+   * Guarda un nuevo jugador o actualiza uno existente
+   * Valida que todos los campos obligatorios estén completos antes de guardar
+   */
   const handleSavePlayer = async () => {
     if (!playerForm.name || !playerForm.email || !playerForm.phone || !playerForm.position || !playerForm.jersey_number) {
       alert('Por favor completa todos los campos obligatorios');
@@ -151,6 +193,27 @@ function App() {
     }
   };
 
+  /**
+   * Abre el modal de detalles del jugador
+   * @param {any} player - Objeto del jugador a mostrar
+   */
+  const handleViewPlayerDetails = (player: any) => {
+    setSelectedPlayer(player);
+    setShowPlayerDetails(true);
+  };
+
+  /**
+   * Cierra el modal de detalles del jugador
+   */
+  const closePlayerDetails = () => {
+    setShowPlayerDetails(false);
+    setSelectedPlayer(null);
+  };
+
+  /**
+   * Carga los datos de un jugador en el formulario para edición
+   * @param {any} player - Objeto del jugador a editar
+   */
   const handleEditPlayer = (player: any) => {
     setPlayerForm({
       name: player.name,
@@ -158,15 +221,19 @@ function App() {
       phone: player.phone,
       position: player.position,
       group_id: player.group_id || '',
-      birth_date: player.birth_date || '',
+      birth_date: formatDateToISO(player.birth_date) || '',
       emergency_contact: player.emergency_contact || '',
-      join_date: player.join_date || new Date().toISOString().split('T')[0],
+      join_date: formatDateToISO(player.join_date) || new Date().toISOString().split('T')[0],
       jersey_number: player.jersey_number || ''
     });
     setEditingItem(player);
     setShowForm('player');
   };
 
+  /**
+   * Elimina un jugador después de confirmar la acción del usuario
+   * @param {string} playerId - ID del jugador a eliminar
+   */
   const handleDeletePlayer = async (playerId: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar este jugador?')) {
       try {
@@ -181,6 +248,10 @@ function App() {
   };
 
   // CRUD Operations for Payments
+  /**
+   * Guarda un nuevo pago o actualiza uno existente
+   * Valida que todos los campos obligatorios estén completos antes de guardar
+   */
   const handleSavePayment = async () => {
     if (!paymentForm.player_id || !paymentForm.month || !paymentForm.due_date) {
       alert('Por favor completa todos los campos obligatorios');
@@ -202,6 +273,10 @@ function App() {
     }
   };
 
+  /**
+   * Carga los datos de un pago en el formulario para edición
+   * @param {any} payment - Objeto del pago a editar
+   */
   const handleEditPayment = (payment: any) => {
     setPaymentForm({
       player_id: payment.player_id,
@@ -209,12 +284,17 @@ function App() {
       month: payment.month,
       year: payment.year,
       status: payment.status,
-      due_date: payment.due_date
+      due_date: payment.due_date,
+      category: ''
     });
     setEditingItem(payment);
     setShowForm('payment');
   };
 
+  /**
+   * Elimina un pago después de confirmar la acción del usuario
+   * @param {string} paymentId - ID del pago a eliminar
+   */
   const handleDeletePayment = async (paymentId: string) => {
     if (confirm('¿Estás seguro de que quieres eliminar este pago?')) {
       try {
@@ -228,6 +308,10 @@ function App() {
     }
   };
 
+  /**
+   * Alterna el estado de un pago entre 'pendiente' y 'pagado'
+   * @param {string} paymentId - ID del pago cuyo estado se desea cambiar
+   */
   const handleTogglePaymentStatus = async (paymentId: string) => {
     try {
       setOperationLoading(true);
@@ -240,6 +324,10 @@ function App() {
   };
 
   // CRUD Operations for Groups
+  /**
+   * Guarda un nuevo grupo o actualiza uno existente
+   * Valida que todos los campos obligatorios estén completos antes de guardar
+   */
   const handleSaveGroup = async () => {
     if (!groupForm.name || !groupForm.category || !groupForm.coach) {
       alert('Por favor completa todos los campos obligatorios');
@@ -261,6 +349,10 @@ function App() {
     }
   };
 
+  /**
+   * Carga los datos de un grupo en el formulario para edición
+   * @param {any} group - Objeto del grupo a editar
+   */
   const handleEditGroup = (group: any) => {
     setGroupForm({
       name: group.name,
@@ -273,6 +365,10 @@ function App() {
     setShowForm('group');
   };
 
+  /**
+   * Elimina un grupo después de confirmar la acción del usuario
+   * @param {string} groupId - ID del grupo a eliminar
+   */
   const handleDeleteGroup = async (groupId: string) => {
     try {
       setOperationLoading(true);
@@ -285,17 +381,35 @@ function App() {
   };
 
   // Filter functions
-  const filteredPlayers = players.filter(player =>
-    player.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    player.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    player.jersey_number?.toString().includes(searchTerm)
-  );
+  /**
+   * Filtra la lista de jugadores según el término de búsqueda y categoría seleccionada
+   * Busca en nombre, posición y número de camiseta
+   * También filtra por categoría del grupo si está seleccionada
+   */
+  const filteredPlayers = players.filter(player => {
+    const matchesSearch = 
+      player.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      player.position.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      player.jersey_number?.toString().includes(searchTerm);
+    
+    const matchesCategory = !selectedPlayerCategory || player.group_category === selectedPlayerCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
 
+  /**
+   * Filtra la lista de pagos según el término de búsqueda
+   * Busca en nombre del jugador y mes del pago
+   */
   const filteredPayments = payments.filter(payment =>
     payment.player_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     payment.month.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  /**
+   * Filtra la lista de grupos según el término de búsqueda
+   * Busca en nombre y categoría del grupo
+   */
   const filteredGroups = groups.filter(group =>
     group.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     group.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -321,6 +435,11 @@ function App() {
 
   // Form Components
 
+  /**
+   * Renderiza el dashboard con estadísticas generales del equipo
+   * Muestra total de jugadores, pagos al día, pendientes y grupos activos
+   * @returns {JSX.Element} Componente del dashboard
+   */
   const renderDashboard = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -414,18 +533,35 @@ function App() {
     </div>
   );
 
+  /**
+   * Renderiza la sección de gestión de jugadores
+   * Muestra lista de jugadores con opciones para buscar, agregar, editar y eliminar
+   * @returns {JSX.Element} Componente de jugadores
+   */
   const renderPlayers = () => (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre, posición o número..."
-            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar por nombre, posición o número..."
+              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <select
+            value={selectedPlayerCategory}
+            onChange={(e) => setSelectedPlayerCategory(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="">Todas las categorías</option>
+            {categories.map(category => (
+              <option key={category} value={category}>{category}</option>
+            ))}
+          </select>
         </div>
         <button
           onClick={() => setShowForm('player')}
@@ -444,7 +580,11 @@ function App() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPlayers.map(player => (
-            <div key={player.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+            <div 
+              key={player.id} 
+              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => handleViewPlayerDetails(player)}
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
@@ -455,7 +595,7 @@ function App() {
                     <p className="text-sm text-purple-600 font-medium">{player.position}</p>
                   </div>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                   <button 
                     onClick={() => handleEditPlayer(player)}
                     className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
@@ -498,6 +638,11 @@ function App() {
     </div>
   );
 
+  /**
+   * Renderiza la sección de gestión de pagos
+   * Muestra tabla de pagos con opciones para buscar, crear, editar, eliminar y cambiar estado
+   * @returns {JSX.Element} Componente de pagos
+   */
   const renderPayments = () => (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -621,6 +766,11 @@ function App() {
     </div>
   );
 
+  /**
+   * Renderiza la sección de gestión de grupos
+   * Muestra tarjetas de grupos con información del entrenador, horario y capacidad
+   * @returns {JSX.Element} Componente de grupos
+   */
   const renderGroups = () => (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -710,6 +860,11 @@ function App() {
     </div>
   );
 
+  /**
+   * Renderiza el contenido principal según la sección activa
+   * Cambia dinámicamente entre dashboard, jugadores, pagos y grupos
+   * @returns {JSX.Element} Componente correspondiente a la sección activa
+   */
   const renderContent = () => {
     switch (activeSection) {
       case 'dashboard':
@@ -837,6 +992,7 @@ function App() {
           paymentForm={paymentForm}
           players={players}
           months={months}
+          categories={categories}
           operationLoading={operationLoading}
           onFormChange={handlePaymentFormChange}
           onSave={handleSavePayment}
@@ -852,6 +1008,14 @@ function App() {
           onFormChange={handleGroupFormChange}
           onSave={handleSaveGroup}
           onClose={closeForm}
+        />
+      )}
+      
+      {/* Player Details Modal */}
+      {showPlayerDetails && selectedPlayer && (
+        <PlayerDetails
+          player={selectedPlayer}
+          onClose={closePlayerDetails}
         />
       )}
       

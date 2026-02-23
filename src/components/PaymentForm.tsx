@@ -10,9 +10,11 @@ interface PaymentFormProps {
     year: number;
     status: 'paid' | 'pending';
     due_date: string;
+    category: string;
   };
   players: any[];
   months: string[];
+  categories: string[];
   operationLoading: boolean;
   onFormChange: (field: string, value: string | number) => void;
   onSave: () => void;
@@ -24,11 +26,21 @@ export default function PaymentForm({
   paymentForm,
   players,
   months,
+  categories,
   operationLoading,
   onFormChange,
   onSave,
   onClose
 }: PaymentFormProps) {
+  /**
+   * Filtra los jugadores según la categoría seleccionada
+   * Si no hay categoría seleccionada, muestra todos los jugadores
+   * Busca jugadores que pertenezcan a grupos con la categoría seleccionada
+   */
+  const filteredPlayersByCategory = paymentForm.category
+    ? players.filter(player => player.group_category === paymentForm.category)
+    : players;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
@@ -43,6 +55,23 @@ export default function PaymentForm({
         
         <div className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+            <select
+              value={paymentForm.category}
+              onChange={(e) => {
+                onFormChange('category', e.target.value);
+                onFormChange('player_id', '');
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="">Todas las categorías</option>
+              {categories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Jugador *</label>
             <select
               value={paymentForm.player_id}
@@ -50,7 +79,7 @@ export default function PaymentForm({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
               <option value="">Seleccionar jugador</option>
-              {players.map(player => (
+              {filteredPlayersByCategory.map(player => (
                 <option key={player.id} value={player.id}>{player.name}</option>
               ))}
             </select>
