@@ -9,6 +9,7 @@ import GroupForm from './components/GroupForm';
 import PaymentReport from './components/PaymentReport';
 import PlayerDetails from './components/PlayerDetails';
 import { usePaymentReport } from './hooks/usePaymentReport';
+import { sendPaymentEmail } from './lib/emailService';
 import { formatDateToISO } from './lib/dateUtils';
 
 type Section = 'dashboard' | 'players' | 'payments' | 'groups';
@@ -53,7 +54,22 @@ function App() {
   }, [activeSection]);
 
   // Payment report hook
-  const { showReport, reportData, generateReport, closeReport } = usePaymentReport();
+  const { showReport, reportData, generateReport, closeReport, getPdfBase64 } = usePaymentReport();
+
+  const handleSendPaymentEmail = async () => {
+    if (!reportData) return;
+    try {
+      const pdfBase64 = await getPdfBase64();
+      if (!pdfBase64) {
+        throw new Error('No se pudo generar el documento PDF.');
+      }
+      
+      await sendPaymentEmail(reportData.payment, reportData.player, pdfBase64);
+      alert('Correo enviado exitosamente.');
+    } catch (error: any) {
+      alert(`Error al enviar el correo: ${error.message}`);
+    }
+  };
 
   // Form states
   const [playerForm, setPlayerForm] = useState({
@@ -1025,6 +1041,7 @@ function App() {
           payment={reportData.payment}
           player={reportData.player}
           onClose={closeReport}
+          onSendEmail={handleSendPaymentEmail}
         />
       )}
     </div>

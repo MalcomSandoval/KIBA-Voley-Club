@@ -70,11 +70,59 @@ export function usePaymentReport() {
     }
   };
 
+  const getPdfBase64 = async (): Promise<string | null> => {
+    if (!reportData) return null;
+
+    try {
+      const jsPDF = (await import('jspdf')).default;
+      const html2canvas = (await import('html2canvas')).default;
+
+      // Obtener el elemento que queremos renderizar a PDF
+      const element = document.getElementById('payment-report');
+      if (!element) return null;
+
+      // Configurar html2canvas
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const imgWidth = 210; 
+      const pageHeight = 295; 
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Convertir PDF a string en formato base64 sin prefijos URI
+      const dataUri = pdf.output('datauristring');
+      return dataUri.split('base64,')[1];
+    } catch (error) {
+      console.error('Error generating PDF Base64:', error);
+      return null;
+    }
+  };
+
   return {
     showReport,
     reportData,
     generateReport,
     closeReport,
-    downloadPDF
+    downloadPDF,
+    getPdfBase64
   };
 }

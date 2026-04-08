@@ -1,13 +1,25 @@
-import React from 'react';
-import { Wallet as Volleyball, Calendar, DollarSign, User, Phone, Mail, Hash, CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Wallet as Volleyball, Calendar, DollarSign, User, Phone, Mail, Hash, CheckCircle, Send, Loader2 } from 'lucide-react';
 
 interface PaymentReportProps {
   payment: any;
   player: any;
   onClose: () => void;
+  onSendEmail?: () => Promise<void>;
 }
 
-export default function PaymentReport({ payment, player, onClose }: PaymentReportProps) {
+export default function PaymentReport({ payment, player, onClose, onSendEmail }: PaymentReportProps) {
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSendEmail = async () => {
+    if (!onSendEmail) return;
+    setIsSending(true);
+    try {
+      await onSendEmail();
+    } finally {
+      setIsSending(false);
+    }
+  };
   const currentDate = new Date().toLocaleDateString('es-CO', {
     year: 'numeric',
     month: 'long',
@@ -21,6 +33,16 @@ export default function PaymentReport({ payment, player, onClose }: PaymentRepor
         <div className="flex justify-between items-center p-4 border-b bg-purple-50">
           <h3 className="text-lg font-semibold text-purple-900">Vista Previa del Reporte</h3>
           <div className="flex space-x-2">
+            {onSendEmail && (
+              <button
+                onClick={handleSendEmail}
+                disabled={isSending}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center space-x-1"
+              >
+                {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                <span>{isSending ? 'Enviando...' : 'Enviar por Correo'}</span>
+              </button>
+            )}
             <button
               onClick={() => window.print()}
               className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
