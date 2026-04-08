@@ -197,16 +197,26 @@ export function useSupabaseData(userId: string | undefined) {
   const createPlayer = async (playerData: Omit<Tables['players']['Insert'], 'user_id'>) => {
     if (!userId) return null;
 
-    // Check if jersey number is already taken - SIN FILTRO user_id
-    if (playerData.jersey_number) {
-      const { data: existingPlayer } = await supabase
-        .from('players')
-        .select('id')
-        .eq('jersey_number', playerData.jersey_number)
+    // Check if jersey number is already taken - SOLAMENTE en su misma categoría
+    if (playerData.jersey_number && playerData.group_id) {
+      // 1. Obtener la categoría del grupo
+      const { data: groupData } = await supabase
+        .from('groups')
+        .select('category')
+        .eq('id', playerData.group_id)
         .single();
 
-      if (existingPlayer) {
-        throw new Error(`El número de camiseta ${playerData.jersey_number} ya está en uso`);
+      if (groupData) {
+        // 2. Buscar si alguien más tiene ese número en esa misma categoría
+        const { data: existingPlayers } = await supabase
+          .from('players')
+          .select('id, groups!inner(category)')
+          .eq('jersey_number', playerData.jersey_number)
+          .eq('groups.category', groupData.category);
+
+        if (existingPlayers && existingPlayers.length > 0) {
+          throw new Error(`El número de camiseta ${playerData.jersey_number} ya está en uso en la categoría ${groupData.category}`);
+        }
       }
     }
 
@@ -229,17 +239,25 @@ export function useSupabaseData(userId: string | undefined) {
   };
 
   const updatePlayer = async (id: string, playerData: Tables['players']['Update']) => {
-    // Check if jersey number is already taken - SIN FILTRO user_id
-    if (playerData.jersey_number) {
-      const { data: existingPlayer } = await supabase
-        .from('players')
-        .select('id')
-        .eq('jersey_number', playerData.jersey_number)
-        .neq('id', id)
+    // Check if jersey number is already taken - SOLAMENTE en su misma categoría
+    if (playerData.jersey_number && playerData.group_id) {
+      const { data: groupData } = await supabase
+        .from('groups')
+        .select('category')
+        .eq('id', playerData.group_id)
         .single();
 
-      if (existingPlayer) {
-        throw new Error(`El número de camiseta ${playerData.jersey_number} ya está en uso`);
+      if (groupData) {
+        const { data: existingPlayers } = await supabase
+          .from('players')
+          .select('id, groups!inner(category)')
+          .eq('jersey_number', playerData.jersey_number)
+          .eq('groups.category', groupData.category)
+          .neq('id', id);
+
+        if (existingPlayers && existingPlayers.length > 0) {
+          throw new Error(`El número de camiseta ${playerData.jersey_number} ya está en uso en la categoría ${groupData.category}`);
+        }
       }
     }
 
