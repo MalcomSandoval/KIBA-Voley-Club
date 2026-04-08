@@ -38,6 +38,8 @@ function App() {
   const [activeSection, setActiveSection] = useState<Section>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPlayerCategory, setSelectedPlayerCategory] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterYear, setFilterYear] = useState('');
   const [showForm, setShowForm] = useState<FormType>(null);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [operationLoading, setOperationLoading] = useState(false);
@@ -50,6 +52,8 @@ function App() {
   useEffect(() => {
     setSearchTerm('');
     setSelectedPlayerCategory('');
+    setFilterMonth('');
+    setFilterYear('');
     setShowForm(null);
   }, [activeSection]);
 
@@ -414,13 +418,35 @@ function App() {
   });
 
   /**
-   * Filtra la lista de pagos según el término de búsqueda
-   * Busca en nombre del jugador y mes del pago
+   * Filtra la lista de pagos según el término de búsqueda, mes y año
    */
-  const filteredPayments = payments.filter(payment =>
-    payment.player_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    payment.month.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPayments = payments.filter(payment => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = payment.player_name?.toLowerCase().includes(searchLower) ||
+                          payment.month.toLowerCase().includes(searchLower) ||
+                          payment.year.toString().includes(searchLower);
+    
+    const matchesMonth = filterMonth ? payment.month === filterMonth : true;
+    const matchesYear = filterYear ? payment.year.toString() === filterYear : true;
+
+    return matchesSearch && matchesMonth && matchesYear;
+  });
+
+  // Agrupar por mes y año
+  const groupedPayments = filteredPayments.reduce((groups, payment) => {
+    const groupName = `${payment.month} ${payment.year}`;
+    if (!groups[groupName]) {
+      groups[groupName] = [];
+    }
+    groups[groupName].push(payment);
+    return groups;
+  }, {} as Record<string, typeof payments>);
+
+  // Obtener los años únicos para el filtro de años
+  const uniqueYears = Array.from(new Set(payments.map(p => p.year))).sort((a, b) => b - a);
+
+  // Lista de meses fijos
+  const monthsList = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
   /**
    * Filtra la lista de grupos según el término de búsqueda
@@ -662,19 +688,41 @@ function App() {
   const renderPayments = () => (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar pagos..."
-            className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full sm:w-auto">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar pagos..."
+              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <select
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent flex-1 sm:flex-none"
+          >
+            <option value="">Todos los meses</option>
+            {monthsList.map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent flex-1 sm:flex-none"
+          >
+            <option value="">Todos los años</option>
+            {uniqueYears.map(y => (
+              <option key={y} value={y.toString()}>{y}</option>
+            ))}
+          </select>
         </div>
         <button
           onClick={() => setShowForm('payment')}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 transition-colors w-full sm:w-auto"
         >
           <Plus className="h-4 w-4" />
           <span>Nuevo Pago</span>
@@ -687,96 +735,94 @@ function App() {
           <p className="text-gray-500 mt-2">Cargando pagos...</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Jugador
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Período
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cantidad
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vencimiento
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments.map(payment => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                          <DollarSign className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div className="text-sm font-medium text-gray-900">{payment.player_name}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {payment.month} {payment.year}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${payment.amount.toLocaleString('es-CO')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleTogglePaymentStatus(payment.id)}
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors ${
-                          payment.status === 'paid' 
-                            ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                            : 'bg-red-100 text-red-800 hover:bg-red-200'
-                        }`}
-                      >
-                        {payment.status === 'paid' ? 'Pagado' : 'Pendiente'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(payment.due_date).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button 
-                          onClick={() => {
-                            const player = players.find(p => p.id === payment.player_id);
-                            if (player) {
-                              generateReport(payment, player);
-                            }
-                          }}
-                          className="text-green-600 hover:text-green-900 transition-colors"
-                          title="Generar reporte"
-                        >
-                          <DollarSign className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleEditPayment(payment)}
-                          className="text-blue-600 hover:text-blue-900 transition-colors"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeletePayment(payment.id)}
-                          className="text-red-600 hover:text-red-900 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-8">
+          {Object.keys(groupedPayments).length === 0 ? (
+            <div className="text-center py-8 bg-white rounded-lg shadow-md">
+              <p className="text-gray-500">No se encontraron pagos con los filtros actuales.</p>
+            </div>
+          ) : (
+            Object.entries(groupedPayments).map(([groupName, groupPayments]) => (
+              <div key={groupName} className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="bg-purple-50 px-6 py-3 border-b border-purple-100 flex justify-between items-center">
+                  <h4 className="text-lg font-semibold text-purple-900">{groupName}</h4>
+                  <span className="text-sm text-purple-600 font-medium">{groupPayments.length} pago(s)</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jugador</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimiento</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {groupPayments.map(payment => (
+                        <tr key={payment.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                                <DollarSign className="h-4 w-4 text-purple-600" />
+                              </div>
+                              <div className="text-sm font-medium text-gray-900">{payment.player_name}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${payment.amount.toLocaleString('es-CO')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => handleTogglePaymentStatus(payment.id)}
+                              className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                                payment.status === 'paid' 
+                                  ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                                  : 'bg-red-100 text-red-800 hover:bg-red-200'
+                              }`}
+                            >
+                              {payment.status === 'paid' ? 'Pagado' : 'Pendiente'}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(payment.due_date).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex space-x-2">
+                              <button 
+                                onClick={() => {
+                                  const player = players.find(p => p.id === payment.player_id);
+                                  if (player) {
+                                    generateReport(payment, player);
+                                  }
+                                }}
+                                className="text-green-600 hover:text-green-900 transition-colors"
+                                title="Generar reporte"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleEditPayment(payment)}
+                                className="text-blue-600 hover:text-blue-900 transition-colors"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeletePayment(payment.id)}
+                                className="text-red-600 hover:text-red-900 transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>
