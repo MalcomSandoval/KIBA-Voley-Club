@@ -17,9 +17,18 @@ export async function sendPaymentEmail(payment: any, player: any, pdfBase64: str
       }),
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    let data: any = {};
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      // Si no es JSON, guardar el texto tal cual
+      data = { error: responseText };
+    }
+
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Error al enviar el correo');
+      const errorMessage = typeof data.error === 'string' ? data.error : (data.error?.message || data.message || responseText.substring(0, 100) || 'Error al enviar el correo');
+      throw new Error(errorMessage);
     }
     
     return data;
