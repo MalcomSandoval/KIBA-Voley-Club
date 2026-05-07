@@ -16,19 +16,17 @@ export default async function handler(req, res) {
   try {
     const { email, playerName, amount, period, paymentId, status, dueDate, pdfBase64 } = req.body;
 
-    // Configuración del servidor de salida de correo (SMTP Gmail)
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER, // Tu correo en .env
-        pass: process.env.EMAIL_PASS, // Tu contraseña de app en .env
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
-    // Opciones del correo
     const mailOptions = {
       from: `"KIBA Volleyball" <${process.env.EMAIL_USER}>`,
-      to: email, // El correo de cualquier jugador enviado desde el cliente
+      to: email,
       subject: `Comprobante de Pago - ${period} - KIBA Volleyball`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
@@ -56,7 +54,6 @@ export default async function handler(req, res) {
       ] : []
     };
 
-    // Enviar correo
     const info = await transporter.sendMail(mailOptions);
     return res.status(200).json({ data: info });
 
