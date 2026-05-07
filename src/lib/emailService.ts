@@ -27,13 +27,19 @@ export async function sendPaymentEmail(payment: any, player: any, pdfBase64: str
     }
 
     if (!response.ok) {
-      const errorMessage = typeof data.error === 'string' ? data.error : (data.error?.message || data.message || responseText.substring(0, 100) || 'Error al enviar el correo');
+      const errorMessage = data.error || responseText.substring(0, 100) || 'Error al enviar el correo';
+      if (errorMessage.includes('Faltan las credenciales')) {
+        throw new Error('Configuración incompleta: Por favor, configura tu correo y contraseña en el archivo .env');
+      }
       throw new Error(errorMessage);
     }
     
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error enviando email:', error);
+    if (error.message === 'Failed to fetch') {
+      throw new Error('No se pudo conectar con el servidor de correos. Asegúrate de que el servidor de desarrollo esté corriendo.');
+    }
     throw error;
   }
 }
